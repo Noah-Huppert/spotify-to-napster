@@ -1,0 +1,19 @@
+{
+   "name": "spotify-to-napster",
+   "version": "0.1.0",
+   "description": "",
+   "main": "index.js",
+   "type": "module",
+   "scripts": {
+      "test": "echo \"Error: no test specified\" && exit 1",
+      "start": "node index.js"
+   },
+   "author": "",
+   "license": "MIT",
+   "dependencies": {
+      "cookie-parser": "^1.4.5",
+      "express": "^4.17.1",
+      "mongodb": "^3.6.3",
+      "spotify-web-api-node": "^5.0.0"
+   }
+}
