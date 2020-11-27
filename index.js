@@ -24,8 +24,11 @@ const SPOTIFY_OAUTH_SCOPES = [
     // Basic login
     "user-read-private", "user-read-email",
 
-    // Read user playlists
-    "playlist-read-private",  "playlist-read-collaborative"
+    // Read user's playlists
+    "playlist-read-private",  "playlist-read-collaborative",
+
+    // Read user's saved tracks
+    "user-library-read",
 ].join(" ");
 
 /**
@@ -248,18 +251,6 @@ state=${from}`);
         if (force === undefined) {
             force = false;
         }
-        
-	    // Sync Spotify user into database
-	    const userUpdate = (await db.users.findOneAndUpdate({
-		    "spotify.userId": req.spotify.auth.user.id,
-	    }, {
-		    $set: {
-			    spotify: {
-				    userId: req.spotify.auth.user.id,
-				    user: req.spotify.auth.user,
-			    },
-		    },
-	    }, { upsert: true, returnOriginal: false })).value;
 
 	    // Sync Spotify playlists into database
 	    const playlists = (await spotifyPage(async (offset) => {
@@ -336,8 +327,65 @@ state=${from}`);
 			    "spotify.userId": req.spotify.auth.user.id,
 		}).toArray();
 
+        // Sync saved user tracks
+        let syncUser = true;
+        
+        if (force === false) {
+            const foundUser = await db.users.findOne({
+                "spotify.userId": req.spotify.auth.user.id,
+            });
+
+            if (foundUser !== null) {
+                syncUser = false;
+            }
+        }
+
+        if (syncUser === true) {
+		    const savedTracks = await spotifyPage(async (offset) => {
+			    return await req.spotify.client.getMySavedTracks({
+				    offset: offset,
+			    });
+		    });
+
+		    const savedTracksUpdates = await Promise.all(savedTracks.map(async (track) => {
+			    return (await db.tracks.findOneAndUpdate({
+				    "spotify.trackId": track.track.id,
+			    }, {
+				    $set: {
+				        spotify: {
+					        trackId: track.track.id,
+					        track: track,
+				        },
+				    },
+			    }, { upsert: true, returnOriginal: false })).value;
+            }));
+            const savedTracksIds = savedTracksUpdates.map((track) => {
+                return {
+                    _id: track._id.toString(),
+                    trackId: track.spotify.trackId,
+                };
+            });
+
+            // Sync Spotify user into database
+	        const userUpdate = (await db.users.findOneAndUpdate({
+		        "spotify.userId": req.spotify.auth.user.id,
+	        }, {
+		        $set: {
+			        spotify: {
+				        userId: req.spotify.auth.user.id,
+				        user: req.spotify.auth.user,
+                        savedTracks: savedTracksIds,
+			        },
+		        },
+	        }, { upsert: true, returnOriginal: false })).value;
+        }
+
+        const storedUser = await db.users.findOne({
+            "spotify.userId": req.spotify.auth.user.id,
+        });
+
 	    return res.send({
-		    user: userUpdate,
+		    user: storedUser,
 		    playlists: usersPlaylists,
 	    });
     }));
