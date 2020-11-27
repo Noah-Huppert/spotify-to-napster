@@ -4,6 +4,13 @@
 # - status: get status of container, outputs "running" if Mongo server is running,
 #           "stopped" if the Mongo container is stopped but still exists, and
 #           "not found" if the Mongo container does not exist.
+prog_dir=$(dirname $(realpath "$0"))
+   
+function die() {
+    echo "mongo: $@" >&2
+    exit 1
+}
+
 if [ -z "$CONTAINER_CLI" ]; then
     CONTAINER_CLI="sudo podman"
 fi
@@ -11,17 +18,28 @@ fi
 container_name=dev-spotify-to-napster
 container_tag="mongo:latest"
 
-function die() {
-    echo "mongo: $@" >&2
-    exit 1
-}
+container_host_db_dir="$prog_dir/container-data/mongodb"
+container_guest_db_dir="/data/db"
+if ! mkdir -p "$container_host_db_dir" &> /dev/null; then
+    die "Failed to create host container database directory"
+fi
 
 case "$1" in
     start)
 	   case $($0 status) in
 		  running) die "already running" ;;
 		  stopped) $CONTAINER_CLI start "$container_name" ;;
-		  "not found") $CONTAINER_CLI run -d --net host --name "$container_name" "$container_tag" ;;
+		  "not found")
+			 $CONTAINER_CLI run \
+						 -d \
+						 --net host \
+						 -v "$container_host_db_dir:$container_guest_db_dir" \
+						 --name "$container_name" \
+						 "$container_tag"
+			 if [[ "$?" != "0" ]]; then
+				die "Failed to start"
+			 fi
+			 ;;
 	   esac
 	   ;;
     status)

@@ -53,6 +53,7 @@ NodeJs must be installed.
 
 # Development
 This tool uses NodeJs. User's authenticate with Spotify and Napster using OAuth.
+Their credentials are stored in browser cookies.
 
 This tool provides an HTTP API which performs the OAuth flows and interacts with
 each service.
@@ -60,7 +61,48 @@ each service.
 Data from each service is synced and stored in a MongoDB server.
 
 ## MongoDB Data
-Generally each data type follows the pattern: Has a `spotify` and `napster` 
-field under which service specific data is stored. In these sub-keys fields
-named `<data type name>Id` store service specific IDs. Fields named `_id` always
-store database IDs.
+Generally each data type has a `spotify` and `napster` field under which service
+specific data is stored. In these sub-keys fields named `<data type name>Id`
+store service specific IDs. Fields named `_id` always store database IDs. There
+will also be a key named `<data type name>` within these sub-keys with the 
+service specific data. 
+
+## HTTP API
+If an endpoint responds with an error HTTP code the response body should be JSON
+encoded with an `error` key explaining what went wrong.
+
+### `GET /api/v0/spotify/login`
+Redirects the user to the start of the Spotify OAuth flow.
+
+**Request**:  
+
+URL query parameters:
+
+- `from` (String, optional): URL to redirect user to after the Spotify OAuth 
+  flow. Defaults to `/`. 
+  
+**Response**:  
+
+Redirects the user to the start of the Spotify OAuth flow. The end result will 
+redirect the user back to this server. The result of the login process can be
+determined by looking at the `spotifyOAuth` URL query parameter which will 
+either be `fail` or `success`.
+
+### `GET /api/v0/spotify/sync`
+Synchronizes a user's Spotify account, playlist, and saved track information 
+into the database.
+
+**Request**:  
+
+URL query parameters:
+
+- `force` (Boolean, optional): If `true` forces the endpoint to re-fetch the 
+  details of playlists and tracks which are already stored in the database. 
+  Defaults to `false`.
+  
+**Response**:  
+
+JSON body:
+
+- `user` (Object): Updated user object as stored in database.
+- `playlists` (Object[]): Updated user playlists as stored in database.
